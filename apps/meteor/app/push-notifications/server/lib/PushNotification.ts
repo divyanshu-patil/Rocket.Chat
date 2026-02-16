@@ -90,6 +90,8 @@ class PushNotification {
 
 	async send({ rid, uid, mid, roomName, username, message, payload, badge = 1, category }: PushNotificationData): Promise<void> {
 		const idOnly = settings.get<boolean>('Push_request_content_from_server');
+		console.log('Creating push with notId', this.getNotificationId(rid));
+
 		const config = this.getNotificationConfig({
 			rid,
 			uid,

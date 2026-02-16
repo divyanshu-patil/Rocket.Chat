@@ -3,6 +3,8 @@ import { NotificationQueue, Subscriptions } from '@rocket.chat/models';
 
 import { callbacks } from './callbacks';
 import { notifyOnSubscriptionChangedByRoomIdAndUserId } from '../../app/lib/server/lib/notifyListener';
+import { Push } from '../../app/push/server';
+import PushNotification from '../../app/push-notifications/server/lib/PushNotification';
 
 export async function readMessages(room: IRoom, uid: IUser['_id'], readThreads: boolean): Promise<void> {
 	await callbacks.run('beforeReadMessages', room._id, uid);
@@ -22,6 +24,27 @@ export async function readMessages(room: IRoom, uid: IUser['_id'], readThreads: 
 	}
 
 	await NotificationQueue.clearQueueByUserId(uid);
+
+	console.log('Creating read push with notId', PushNotification.getNotificationId(room._id));
+
+	await Push.send({
+		from: 'push',
+		userId: uid,
+		notId: PushNotification.getNotificationId(room._id),
+
+		badge: 0,
+		sound: '',
+		priority: 5,
+
+		title: '',
+		text: '',
+
+		payload: {
+			host: Meteor.absoluteUrl(),
+			notificationType: 'message-clear',
+			rid: room._id,
+		},
+	});
 
 	const lastSeen = sub.ls || sub.ts;
 	callbacks.runAsync('afterReadMessages', room, { uid, lastSeen });

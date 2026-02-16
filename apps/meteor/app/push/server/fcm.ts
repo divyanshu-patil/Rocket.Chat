@@ -138,22 +138,21 @@ function getFCMMessagesFromPushData(userTokens: string[], notification: PendingP
 		data['content-available'] = notification.contentAvailable.toString();
 	}
 
-	// then we will create the notification field
-	const notificationField: FCMNotificationField = {
-		title: notification.title,
-		body: notification.text,
-	};
-
 	// then we will create the message
+
+	// ⭐ IMPORTANT — move title + text into data
+	data.title = notification.title;
+	data.text = notification.text;
+
+	console.log('notificatoin text', notification.text);
+
 	const message: FCMMessage = {
-		notification: notificationField,
 		data,
 		android: {
 			priority: 'HIGH',
 		},
 	};
 
-	// then we will create the message for each token
 	return userTokens.map((token) => ({ message: { ...message, token } }));
 }
 

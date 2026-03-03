@@ -144,7 +144,7 @@ function getFCMMessagesFromPushData(userTokens: string[], notification: PendingP
 	data.title = notification.title;
 	data.text = notification.text;
 
-	console.log('notificatoin text', notification.text);
+	console.log('notificatoin text', data);
 
 	const message: FCMMessage = {
 		data,

@@ -17,6 +17,10 @@ export class NotificationsModule {
 
 	public readonly streamRoomUsers: IStreamer<'notify-room-users'>;
 
+	public readonly streamUserTyping: IStreamer<'user-typing'>;
+
+	public readonly streamUserTypingGlobal: IStreamer<'user-typing-global'>;
+
 	public readonly streamUser: IStreamer<'notify-user'> & {
 		on(event: string, fn: (...data: any[]) => void): void;
 	};
@@ -50,6 +54,8 @@ export class NotificationsModule {
 		this.streamLogged = new this.Streamer('notify-logged');
 		this.streamRoom = new this.Streamer('notify-room');
 		this.streamRoomUsers = new this.Streamer('notify-room-users');
+		this.streamUserTyping = new this.Streamer('user-typing');
+		this.streamUserTypingGlobal = new this.Streamer('user-typing-global');
 		this.streamImporters = new this.Streamer('importers', { retransmit: false });
 		this.streamRoles = new this.Streamer('roles');
 		this.streamApps = new this.Streamer('apps', { retransmit: false });
@@ -250,6 +256,55 @@ export class NotificationsModule {
 			}
 			return false;
 		});
+
+		// Stream for all users in a room (subscribed or not)
+		this.streamUserTyping.allowWrite(async function (eventName, data): Promise<boolean> {
+			const [rid] = eventName.split('/');
+			if (!this.userId) return false;
+
+			const room = await Rooms.findOneById(rid);
+			if (!room) return false;
+
+			const canAccess = await Authorization.canAccessRoom(room, { _id: this.userId });
+			if (!canAccess) return false;
+
+			// Get username for the typing event
+			const key = (await Settings.get('UI_Use_Real_Name')) ? 'name' : 'username';
+			const user = await Users.findOneById<Pick<IUser, 'name' | 'username'>>(this.userId, {
+				projection: { [key]: 1 },
+			});
+
+			if (user) {
+				console.log('[user-typing-global] allowWrite direct emit:', { rid, username: user[key], typing: data.typing });
+				// Directly emit to streamUserTypingGlobal (broadcast to ALL instances)
+				self.streamUserTypingGlobal.emit('user-typing', { rid, username: user[key] ?? '', typing: data.typing });
+			}
+
+			return canAccess;
+		});
+
+		// allowRead and allowEmit for streamUserTyping
+		this.streamUserTyping.allowRead(async function (eventName): Promise<boolean> {
+			const [rid] = eventName.split('/');
+			console.log('[user-typing] allowRead called:', { eventName, userId: this.userId });
+			if (!this.userId) {
+				console.log('[user-typing] allowRead DENIED: no userId');
+				return false;
+			}
+			const room = await Rooms.findOneById(rid);
+			if (!room) {
+				console.log('[user-typing] allowRead DENIED: room not found', rid);
+				return false;
+			}
+			const canAccess = await Authorization.canAccessRoom(room, { _id: this.userId });
+			console.log('[user-typing] allowRead result:', { canAccess, userId: this.userId, roomId: rid });
+			return canAccess;
+		});
+		this.streamUserTyping.allowEmit('all');
+
+		this.streamUserTypingGlobal.allowEmit('all');
+		this.streamUserTypingGlobal.allowRead('all');
+		this.streamUserTypingGlobal.allowWrite('all');
 
 		this.streamUser.allowWrite(async function (eventName, data: unknown) {
 			const [, e] = eventName.split('/');
@@ -485,6 +540,20 @@ export class NotificationsModule {
 		...args: E extends ExtractNotifyUserEventName<'notify-user', P> ? StreamerCallbackArgs<'notify-user', `${P}/${E}`> : never
 	): void {
 		return this.streamUser.emitWithoutBroadcast(`${userId}/${eventName}`, ...args);
+	}
+
+	notifyUserTypingInRoom<P extends string>(room: P, ...args: StreamerCallbackArgs<'user-typing', `${P}/user-typing`>): void {
+		console.log('[user-typing-global] notifyUserTypingInRoom emitting:', { room, args });
+		this.streamUserTyping.emit(`${room}/user-typing`, ...args);
+		console.log('[user-typing-global] emitting to streamUserTypingGlobal:', { rid: room, ...args[0] });
+		this.streamUserTypingGlobal.emit('user-typing', { rid: room, ...args[0] });
+	}
+
+	notifyUserTypingInRoomInThisInstance<P extends string>(room: P, ...args: StreamerCallbackArgs<'user-typing', `${P}/user-typing`>): void {
+		console.log('[user-typing-global] notifyUserTypingInRoomInThisInstance emitting:', { room, args });
+		this.streamUserTyping.emitWithoutBroadcast(`${room}/user-typing`, ...args);
+		console.log('[user-typing-global] emitting to streamUserTypingGlobal (instance):', { rid: room, ...args[0] });
+		this.streamUserTypingGlobal.emitWithoutBroadcast('user-typing', { rid: room, ...args[0] });
 	}
 
 	sendPresence(uid: string, ...args: [username: string, status?: 0 | 1 | 2 | 3, statusText?: string]): void {

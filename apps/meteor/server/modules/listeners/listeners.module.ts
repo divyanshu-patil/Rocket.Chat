@@ -192,7 +192,11 @@ export class ListenersModule {
 		});
 
 		service.onEvent('user.activity', ({ isTyping, roomId, user }) => {
+			console.log('[user-typing] user.activity event received:', { roomId, user, isTyping });
 			notifications.notifyRoomInThisInstance(roomId, 'user-activity', user, isTyping ? ['user-typing'] : []);
+			// Also broadcast to user-typing stream for ALL users in room (subscribed or not) across ALL instances
+			console.log('[user-typing] calling notifyUserTypingInRoom:', { roomId, username: user, typing: isTyping });
+			notifications.notifyUserTypingInRoom(roomId, { username: user, typing: isTyping });
 		});
 
 		service.onEvent('watch.messages', async ({ message }) => {
@@ -419,6 +423,10 @@ export class ListenersModule {
 
 		service.onEvent('notify.e2e.keyRequest', (rid, data): void => {
 			notifications.notifyRoomInThisInstance(rid, 'e2e.keyRequest', data);
+		});
+
+		service.onEvent('stream.user-typing', (data: { rid: string; data: { username: string; typing: boolean } }): void => {
+			notifications.notifyUserTypingInRoomInThisInstance(data.rid, data.data);
 		});
 
 		service.onEvent('notify.deleteMessage', (rid, data): void => {

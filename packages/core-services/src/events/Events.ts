@@ -113,6 +113,7 @@ export type EventSignatures = {
 			  }
 		),
 	): void;
+	'stream.user-typing'(data: { rid: string; data: { username: string; typing: boolean } }): void;
 	'notify.deleteCustomSound'(data: { soundData: ICustomSound }): void;
 	'notify.updateCustomSound'(data: { soundData: ICustomSound }): void;
 	'notify.calendar'(uid: string, data: ICalendarNotification): void;

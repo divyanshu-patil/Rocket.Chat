@@ -28,6 +28,60 @@ const rooms = new Map<string, (username: string, activityType: string[], extras?
 const performingUsers = new Map<string, IRoomActivity>();
 const performingUsersEmitter = new Emitter<{ changed: void }>();
 
+// Global subscription to receive typing events from ALL rooms (even when not subscribed to room)
+let globalTypingStop: (() => void) | null = null;
+
+const setupGlobalTypingSubscription = () => {
+	if (globalTypingStop) return;
+
+	const { stop } = sdk.stream('user-typing-global', ['user-typing'], (data: { rid: string; username: string; typing: boolean }) => {
+		console.log('[user-typing-global] received:', data);
+		const { rid, username, typing } = data;
+
+		// Skip if this is our own typing event
+		const uid = getUserId();
+		const user = uid ? Users.state.get(uid) : undefined;
+		if (username === shownName(user)) {
+			return;
+		}
+
+		// Update the performingUsers map for this room
+		const roomActivities = { ...performingUsers.get(rid) };
+		roomActivities[USER_ACTIVITIES.USER_TYPING] = roomActivities[USER_ACTIVITIES.USER_TYPING] || new Map();
+
+		if (typing) {
+			(roomActivities[USER_ACTIVITIES.USER_TYPING] as Map<string, NodeJS.Timeout>).set(
+				username,
+				setTimeout(() => {
+					handleGlobalTypingTimeout(rid, username);
+				}, TIMEOUT),
+			);
+		} else {
+			const timeout = (roomActivities[USER_ACTIVITIES.USER_TYPING] as Map<string, NodeJS.Timeout>).get(username);
+			if (timeout) {
+				clearTimeout(timeout);
+				(roomActivities[USER_ACTIVITIES.USER_TYPING] as Map<string, NodeJS.Timeout>).delete(username);
+			}
+		}
+
+		performingUsers.set(rid, roomActivities);
+		performingUsersEmitter.emit('changed');
+	});
+
+	globalTypingStop = stop;
+};
+
+const handleGlobalTypingTimeout = (rid: string, username: string) => {
+	const roomActivities = { ...performingUsers.get(rid) };
+	roomActivities[USER_ACTIVITIES.USER_TYPING] = roomActivities[USER_ACTIVITIES.USER_TYPING] || new Map();
+	(roomActivities[USER_ACTIVITIES.USER_TYPING] as Map<string, NodeJS.Timeout>).delete(username);
+	performingUsers.set(rid, roomActivities);
+	performingUsersEmitter.emit('changed');
+};
+
+// Initialize global subscription on module load
+setupGlobalTypingSubscription();
+
 const shownName = function (user: IUser | null | undefined): string | undefined {
 	if (!user) {
 		return;
@@ -40,7 +94,13 @@ const shownName = function (user: IUser | null | undefined): string | undefined 
 
 const emitActivities = debounce(async (rid: string, extras: IExtras): Promise<void> => {
 	const activities = roomActivities.get(extras?.tmid || rid) || new Set();
+	// Publish to notify-room stream (only subscribed users)
 	sdk.publish('notify-room', [`${rid}/${USER_ACTIVITY}`, shownName(getUser()), [...activities], extras]);
+	// Also publish to user-typing stream (all users in room, subscribed or not)
+	const username = shownName(getUser());
+	const isTyping = activities.has(USER_ACTIVITIES.USER_TYPING);
+	console.log('[user-typing] publishing:', rid, { username, typing: isTyping });
+	sdk.publish('user-typing', [`${rid}/user-typing`, { username, typing: isTyping }]);
 }, 500);
 
 function handleStreamAction(rid: string, username: string, activityTypes: string[], extras?: IExtras): void {
@@ -84,12 +144,21 @@ export const UserAction = new (class {
 		};
 		rooms.set(rid, handler);
 
-		const { stop } = sdk.stream('notify-room', [`${rid}/${USER_ACTIVITY}`], handler);
+		const { stop: stopActivity } = sdk.stream('notify-room', [`${rid}/${USER_ACTIVITY}`], handler);
+
+		// Subscribe to user-typing stream (receives typing events from all users in room, subscribed or not)
+		const { stop: stopTyping } = sdk.stream('user-typing-global', [`user-typing`], (data: { username: string; typing: boolean }) => {
+			console.log('[user-typing] received:', rid, data);
+			const activityType = data.typing ? [USER_ACTIVITIES.USER_TYPING] : [];
+			handleStreamAction(rid, data.username, activityType);
+		});
+
 		return () => {
 			if (!rooms.get(rid)) {
 				return;
 			}
-			stop();
+			stopActivity();
+			stopTyping();
 			rooms.delete(rid);
 		};
 	}

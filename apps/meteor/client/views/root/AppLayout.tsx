@@ -21,6 +21,7 @@ import { useDesktopTitle } from './hooks/useDesktopTitle';
 import { useEmojiOne } from './hooks/useEmojiOne';
 import { useEscapeKeyStroke } from './hooks/useEscapeKeyStroke';
 import { useGoogleTagManager } from './hooks/useGoogleTagManager';
+import { useGlobalTyping } from '../../hooks/useGlobalTyping';
 import { useIframeCommands } from './hooks/useIframeCommands';
 import { useIframeLoginListener } from './hooks/useIframeLoginListener';
 import { useKeyboardShortcutsHotkey } from './hooks/useKeyboardShortcutsHotkey';
@@ -73,6 +74,7 @@ const AppLayout = () => {
 	useLoadMissedMessages();
 	useDesktopFavicon();
 	useDesktopTitle();
+	useGlobalTyping();
 	useStartupEvent();
 	useIframeCommands();
 

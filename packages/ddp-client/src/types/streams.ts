@@ -269,6 +269,20 @@ export interface StreamerEvents {
 		{ key: `${string}/userData`; args: unknown[] },
 	];
 
+	'user-typing': [
+		{
+			key: `${string}/user-typing`;
+			args: [data: { username: string; typing: boolean }];
+		},
+	];
+
+	'user-typing-global': [
+		{
+			key: 'user-typing';
+			args: [{ rid: string; username: string; typing: boolean }];
+		},
+	];
+
 	'livechat-room': [
 		{
 			key: string;

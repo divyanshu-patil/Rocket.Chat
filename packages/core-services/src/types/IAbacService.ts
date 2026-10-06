@@ -7,6 +7,7 @@ import type {
 	AbacAccessOperation,
 	AbacObjectType,
 	ILDAPEntry,
+	AbacUserIdentifiers,
 } from '@rocket.chat/core-typings';
 
 export type AbacActor = Pick<IUser, '_id' | 'username' | 'name'>;
@@ -21,7 +22,7 @@ export interface IAbacService {
 			count?: number;
 		},
 		actor?: AbacActor,
-	): Promise<{ attributes: IAbacAttribute[]; offset: number; count: number; total: number }>;
+	): Promise<{ attributes: Pick<IAbacAttribute, '_id' | 'key' | 'values'>[]; offset: number; count: number; total: number }>;
 	listAbacRooms(
 		filters?: {
 			offset?: number;
@@ -49,6 +50,7 @@ export interface IAbacService {
 	): Promise<boolean>;
 	addSubjectAttributes(user: IUser, ldapUser: ILDAPEntry, map: Record<string, string>, actor: AbacActor | undefined): Promise<void>;
 	evaluateRoomMembership(): Promise<void>;
+	reevaluateUsers(identifiers: AbacUserIdentifiers): Promise<void>;
 	getPDPHealth(): Promise<void>;
 	isExternalAttributeStore(): Promise<boolean>;
 }

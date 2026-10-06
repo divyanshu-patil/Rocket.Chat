@@ -28,6 +28,13 @@ export interface IGetDecisionBulkResponse {
 	}>;
 }
 
+export type ReevaluationUser = Pick<IUser, '_id' | 'emails' | 'username' | '__rooms'>;
+
+export type NonCompliantPair = {
+	user: Pick<IUser, '_id' | 'emails' | 'username'>;
+	room: AtLeast<IRoom, '_id' | 'abacAttributes'>;
+};
+
 export interface IPolicyDecisionPoint {
 	isAvailable(): Promise<boolean>;
 
@@ -45,14 +52,16 @@ export interface IPolicyDecisionPoint {
 		newAttributes: IAbacAttributeDefinition[],
 	): Promise<IUser[]>;
 
-	onSubjectAttributesChanged(user: IUser, next: IAbacAttributeDefinition[]): Promise<IRoom[]>;
+	onSubjectAttributesChanged(user: IUser, next: IAbacAttributeDefinition[]): Promise<Pick<IRoom, '_id' | 'name'>[]>;
 
 	evaluateUserRooms(
 		entries: Array<{
 			user: Pick<IUser, '_id' | 'emails' | 'username'>;
 			rooms: AtLeast<IRoom, '_id' | 'abacAttributes'>[];
 		}>,
-	): Promise<Array<{ user: Pick<IUser, '_id' | 'emails' | 'username'>; room: IRoom }>>;
+	): Promise<NonCompliantPair[]>;
+
+	reevaluateUsers(users: ReevaluationUser[]): Promise<void | NonCompliantPair[]>;
 }
 
 export interface IVirtruPDPConfig {

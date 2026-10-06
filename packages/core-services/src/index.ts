@@ -1,10 +1,20 @@
 import { proxify } from './lib/proxify';
+import type {
+	IAISearchService,
+	AISearchAnswerMessage,
+	AISearchAnswerResult,
+	AISearchFilters,
+	AISearchModelOption,
+	AISearchResult,
+	AISearchStatus,
+	AISearchType,
+} from './types/IAISearchService';
 import type { IAbacService } from './types/IAbacService';
 import type { IAccount, ILoginResult } from './types/IAccount';
 import type { IAnalyticsService } from './types/IAnalyticsService';
 import type { IApiService } from './types/IApiService';
 import type { IAppsEngineService } from './types/IAppsEngineService';
-import type { IAuthorization, RoomAccessValidator } from './types/IAuthorization';
+import type { IAuthorization, RoomAccessValidator, UserWithRoles } from './types/IAuthorization';
 import type { IAuthorizationLivechat } from './types/IAuthorizationLivechat';
 import type { IBannerService } from './types/IBannerService';
 import type { ICalendarService } from './types/ICalendarService';
@@ -14,6 +24,7 @@ import type { IEnterpriseSettings } from './types/IEnterpriseSettings';
 import type { IFederationMatrixService } from './types/IFederationMatrixService';
 import type { IFederationService, IFederationServiceEE } from './types/IFederationService';
 import type { IImportService } from './types/IImportService';
+import type { ILDAPEEService } from './types/ILDAPEEService';
 import type { ILDAPService } from './types/ILDAPService';
 import type { ILicense } from './types/ILicense';
 import type { IMediaCallService } from './types/IMediaCallService';
@@ -33,6 +44,7 @@ import type { IQueueWorkerService, HealthAggResult } from './types/IQueueWorkerS
 import type { IRoomService, ICreateRoomParams, ISubscriptionExtraData } from './types/IRoomService';
 import type { ISAUMonitorService } from './types/ISAUMonitorService';
 import type { ISettingsService } from './types/ISettingsService';
+import type { IStatusVisibilityService } from './types/IStatusVisibilityService';
 import type {
 	ITeamService,
 	ITeamUpdateData,
@@ -60,8 +72,9 @@ export type { IAbacService, AbacActor } from './types/IAbacService';
 export { asyncLocalStorage } from './lib/asyncLocalStorage';
 export { MeteorError, isMeteorError } from './MeteorError';
 export { api } from './api';
-export type { EventSignatures } from './events/Events';
+export type { EventSignatures, RelayedStreamEvent } from './events/Events';
 export { LocalBroker } from './LocalBroker';
+export type { ClusterTransport } from './LocalBroker';
 
 export type { IBroker, IBrokerNode, BaseMetricOptions, CallingOptions, IServiceMetrics } from './types/IBroker';
 
@@ -86,6 +99,9 @@ export type {
 	AnalyticsOverviewDataResult,
 } from './types/IOmnichannelAnalyticsService';
 
+export { getInstanceMethods } from './lib/getInstanceMethods';
+export { LocalServiceRegistry, getCallableMethods } from './lib/LocalServiceRegistry';
+export type { LocalHandler } from './lib/LocalServiceRegistry';
 export { getConnection, getTrashCollection } from './lib/mongo';
 export { ServiceStarter } from './lib/ServiceStarter';
 
@@ -103,6 +119,7 @@ export type {
 	ICreateRoomParams,
 	IDeviceManagementService,
 	IEnterpriseSettings,
+	ILDAPEEService,
 	ILDAPService,
 	ILicense,
 	IListRoomsFilter,
@@ -136,6 +153,7 @@ export type {
 	NPSVotePayload,
 	ResizeResult,
 	RoomAccessValidator,
+	UserWithRoles,
 	TelemetryEvents,
 	TelemetryMap,
 	VideoConferenceJoinOptions,
@@ -144,12 +162,21 @@ export type {
 	IUploadFileParams,
 	IUploadService,
 	ICalendarService,
+	IAISearchService,
+	AISearchAnswerMessage,
+	AISearchAnswerResult,
+	AISearchFilters,
+	AISearchModelOption,
+	AISearchResult,
+	AISearchStatus,
+	AISearchType,
 	ICallHistoryService,
 	IOmnichannelTranscriptService,
 	IQueueWorkerService,
 	HealthAggResult,
 	IMessageService,
 	ISettingsService,
+	IStatusVisibilityService,
 	IOmnichannelEEService,
 	IOmnichannelIntegrationService,
 	IImportService,
@@ -175,6 +202,7 @@ export const Media = proxify<IMediaService>('media');
 export const MediaCall = proxify<IMediaCallService>('media-call');
 export const Analytics = proxify<IAnalyticsService>('analytics');
 export const LDAP = proxify<ILDAPService>('ldap');
+export const LDAPEnterprise = proxify<ILDAPEEService>('ldap-enterprise');
 export const SAUMonitor = proxify<ISAUMonitorService>('sau-monitor');
 export const DeviceManagement = proxify<IDeviceManagementService>('device-management');
 export const VideoConf = proxify<IVideoConfService>('video-conference');
@@ -185,6 +213,7 @@ export const QueueWorker = proxify<IQueueWorkerService>('queue-worker');
 export const OmnichannelTranscript = proxify<IOmnichannelTranscriptService>('omnichannel-transcript');
 export const Message = proxify<IMessageService>('message');
 export const Settings = proxify<ISettingsService>('settings');
+export const StatusVisibility = proxify<IStatusVisibilityService>('status-visibility');
 export const OmnichannelIntegration = proxify<IOmnichannelIntegrationService>('omnichannel-integration');
 export const Federation = proxify<IFederationService>('federation');
 export const FederationEE = proxify<IFederationServiceEE>('federation-enterprise');
@@ -201,3 +230,4 @@ export const EnterpriseSettings = proxify<IEnterpriseSettings>('ee-settings');
 
 export const FederationMatrix = proxify<IFederationMatrixService>('federation-matrix');
 export const Abac = proxify<IAbacService>('abac');
+export const AISearch = proxify<IAISearchService>('ai-search');

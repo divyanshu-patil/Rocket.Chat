@@ -12,10 +12,10 @@ import type {
 	AbacAuditReason,
 	AbacAttributeStoreType,
 	AbacPdpType,
+	AbacUserIdentifiers,
 } from '@rocket.chat/core-typings';
 import { Rooms, AbacAttributes, Users, Subscriptions } from '@rocket.chat/models';
-import { escapeRegExp } from '@rocket.chat/string-helpers';
-import { isTruthy } from '@rocket.chat/tools';
+import { escapeRegExp, isTruthy } from '@rocket.chat/tools';
 import type { Document, UpdateFilter } from 'mongodb';
 import pLimit from 'p-limit';
 
@@ -230,7 +230,7 @@ export class AbacService extends ServiceClass implements IAbacService {
 		if (!(await License.hasModule('abac'))) {
 			return;
 		}
-		const { modifiedCount } = await Rooms.updateMany({ abacAttributes: { $exists: true } }, { $unset: { abacAttributes: '' } });
+		const { modifiedCount } = await Rooms.unsetAllAbacAttributes();
 		if (modifiedCount > 0) {
 			void Audit.attributeStoreSwitched(from, to, modifiedCount);
 		}
@@ -350,7 +350,7 @@ export class AbacService extends ServiceClass implements IAbacService {
 		filters?: { key?: string; values?: string; offset?: number; count?: number },
 		actor?: AbacActor,
 	): Promise<{
-		attributes: IAbacAttribute[];
+		attributes: Pick<IAbacAttribute, '_id' | 'key' | 'values'>[];
 		offset: number;
 		count: number;
 		total: number;
@@ -644,7 +644,7 @@ export class AbacService extends ServiceClass implements IAbacService {
 		// if is the last attribute, just remove all
 		if (previous.length === 1) {
 			await Rooms.unsetAbacAttributesById(rid);
-			void Audit.objectAttributesRemoved({ _id: room._id }, previous, actor);
+			void Audit.objectAttributesRemoved({ _id: room._id, name: room.name }, previous, actor);
 
 			this.broadcastRoomUpdate({ ...room, abacAttributes: undefined });
 
@@ -838,6 +838,7 @@ export class AbacService extends ServiceClass implements IAbacService {
 				logger.error({
 					msg: 'Failed to remove user from ABAC room',
 					rid: room._id,
+					userId: user._id,
 					err,
 					reason,
 				});
@@ -920,7 +921,7 @@ export class AbacService extends ServiceClass implements IAbacService {
 		}
 
 		const abacRooms = await Rooms.findAllPrivateRoomsWithAbacAttributes({
-			projection: { _id: 1, t: 1, teamMain: 1, abacAttributes: 1 },
+			projection: { _id: 1, name: 1, t: 1, teamMain: 1, abacAttributes: 1 },
 		}).toArray();
 
 		if (!abacRooms.length) {
@@ -954,6 +955,30 @@ export class AbacService extends ServiceClass implements IAbacService {
 			await Promise.all(nonCompliant.map(({ user, room }) => limit(() => this.removeUserFromRoom(room, user as IUser, 'virtru-pdp-sync'))));
 		} catch (err) {
 			logger.error({ msg: 'Failed to evaluate room membership', err });
+		}
+	}
+
+	async reevaluateUsers(identifiers: AbacUserIdentifiers): Promise<void> {
+		if (!this.pdp || !(await this.pdp.isAvailable())) {
+			return;
+		}
+
+		const users = await Users.findUsersByIdentifiers(identifiers, {
+			projection: { _id: 1, emails: 1, username: 1, __rooms: 1 },
+		}).toArray();
+
+		if (!users.length) {
+			return;
+		}
+
+		try {
+			const nonCompliant = await this.pdp.reevaluateUsers(users);
+			if (Array.isArray(nonCompliant) && nonCompliant.length) {
+				await Promise.all(nonCompliant.map(({ user, room }) => limit(() => this.removeUserFromRoom(room, user as IUser, 'api'))));
+			}
+		} catch (err) {
+			logger.error({ msg: 'Failed to reevaluate users', err });
+			throw err;
 		}
 	}
 }
